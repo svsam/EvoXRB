@@ -21,6 +21,20 @@ from .parameters import SearchSpace
 DecodedObjective: TypeAlias = Callable[[dict[str, float]], float]
 
 
+# Human-readable arrays stored alongside the resumable checkpoint payload.  The
+# names intentionally match ``GARunResult`` so NPZ inspection and plotting do
+# not require unpickling the optimizer state.
+_CHECKPOINT_HISTORY_NAMES = {
+    "population": "population_history",
+    "scores": "score_history",
+    "best_gene": "best_gene_history",
+    "best_score": "best_score_history",
+    "median_score": "median_score_history",
+    "spread": "gene_spread_history",
+    "boundary_hits": "boundary_hit_history",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class GAConfig:
     """Configuration for :class:`GeneticOptimizer`.
@@ -686,9 +700,30 @@ class GeneticOptimizer:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + ".tmp")
         if path.suffix.lower() == ".npz":
-            payload = np.frombuffer(pickle.dumps(dict(state), protocol=5), dtype=np.uint8)
+            checkpoint_state = dict(state)
+            raw_histories = checkpoint_state.pop("histories", None)
+            payload = np.frombuffer(
+                pickle.dumps(checkpoint_state, protocol=5), dtype=np.uint8
+            )
+            archive: dict[str, Any] = {"payload": payload}
+            if isinstance(raw_histories, Mapping):
+                for internal_name, archive_name in _CHECKPOINT_HISTORY_NAMES.items():
+                    if internal_name in raw_histories:
+                        archive[archive_name] = np.asarray(raw_histories[internal_name])
+            signature = state.get("space_signature", ())
+            archive["parameter_names"] = np.asarray(
+                [str(item[0]) for item in signature], dtype=str
+            )
+            archive["parameter_scales"] = np.asarray(
+                [str(item[3]) for item in signature], dtype=str
+            )
+            archive["immigrant_generations"] = np.asarray(
+                state.get("immigrant_generations", ()), dtype=np.int64
+            )
+            archive["generation"] = np.asarray(state.get("generation", -1), dtype=np.int64)
+            archive["evaluations"] = np.asarray(state.get("evaluations", 0), dtype=np.int64)
             with temporary.open("wb") as handle:
-                np.savez_compressed(handle, payload=payload)
+                np.savez_compressed(handle, **archive)
                 handle.flush()
                 os.fsync(handle.fileno())
         else:
@@ -705,7 +740,17 @@ class GeneticOptimizer:
         if path.suffix.lower() == ".npz":
             with np.load(path, allow_pickle=False) as archive:
                 payload = np.asarray(archive["payload"], dtype=np.uint8).tobytes()
-            state = pickle.loads(payload)
+                state = pickle.loads(payload)
+                if isinstance(state, dict) and not isinstance(
+                    state.get("histories"), Mapping
+                ):
+                    histories = {
+                        internal_name: np.asarray(archive[archive_name]).copy()
+                        for internal_name, archive_name in _CHECKPOINT_HISTORY_NAMES.items()
+                        if archive_name in archive.files
+                    }
+                    if histories:
+                        state["histories"] = histories
         else:
             with path.open("rb") as handle:
                 state = pickle.load(handle)
@@ -750,3 +795,37 @@ class GeneticOptimizer:
             checkpoint_path=str(checkpoint_path) if checkpoint_path is not None else None,
         )
 
+
+def load_ga_checkpoint_history(path: str | Path) -> dict[str, NDArray[Any]]:
+    """Load plotting-ready diagnostic arrays from an EvoXRB GA checkpoint.
+
+    Checkpoints are trusted local artifacts because resumable optimizer state
+    includes a pickled NumPy RNG state.  New NPZ checkpoints also expose these
+    history arrays directly so they can be inspected with ``numpy.load``;
+    this loader retains support for version-1 checkpoints that kept them only
+    inside the serialized payload.
+    """
+
+    state = GeneticOptimizer._load_checkpoint(Path(path))
+    raw_histories = state.get("histories")
+    if not isinstance(raw_histories, Mapping):
+        raise ValueError("checkpoint has no valid histories")
+
+    result: dict[str, NDArray[Any]] = {}
+    for internal_name, public_name in _CHECKPOINT_HISTORY_NAMES.items():
+        if internal_name in raw_histories:
+            result[public_name] = np.asarray(raw_histories[internal_name])
+
+    signature = state.get("space_signature", ())
+    result["parameter_names"] = np.asarray(
+        [str(item[0]) for item in signature], dtype=str
+    )
+    result["parameter_scales"] = np.asarray(
+        [str(item[3]) for item in signature], dtype=str
+    )
+    result["immigrant_generations"] = np.asarray(
+        state.get("immigrant_generations", ()), dtype=np.int64
+    )
+    result["generation"] = np.asarray(state.get("generation", -1), dtype=np.int64)
+    result["evaluations"] = np.asarray(state.get("evaluations", 0), dtype=np.int64)
+    return result

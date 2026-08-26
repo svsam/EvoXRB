@@ -26,6 +26,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 import pandas as pd
 
+from .genetic import load_ga_checkpoint_history
 from .instrument import InstrumentResponse, default_nicer_inspired_response
 from .types import PosteriorResult, SYNTHETIC_LABEL, SyntheticSpectrum
 
@@ -429,14 +430,60 @@ def plot_folded_spectrum(
     return _finish(fig, output_path)
 
 
-def _ga_history(source: Any) -> dict[str, NDArray[np.float64]]:
+def _ga_history(source: Any) -> dict[str, NDArray[Any]]:
+    """Normalize live results, flat NPZ files, and resumable checkpoints.
+
+    Early version-1 checkpoints stored histories inside their serialized
+    ``payload`` member. New checkpoints expose flat arrays, while the fallback
+    loader keeps already-generated campaign products useful.
+    """
+
+    candidate = source
+    mapping = _mapping_from_source(source)
+    if mapping:
+        candidate = mapping
+        flat_history_names = {
+            "population_history",
+            "best_score_history",
+            "median_score_history",
+            "gene_spread_history",
+        }
+        if (
+            "payload" in mapping
+            and not flat_history_names.intersection(mapping)
+            and isinstance(source, (str, Path))
+        ):
+            try:
+                candidate = load_ga_checkpoint_history(source)
+            except Exception:
+                # Reporting accepts absent/corrupt optional artifacts and emits
+                # the documented placeholder rather than aborting the report.
+                candidate = mapping
+
+    def strings(name: str) -> NDArray[np.str_]:
+        raw: Any = None
+        if isinstance(candidate, Mapping):
+            raw = candidate.get(name)
+        elif hasattr(candidate, name):
+            raw = getattr(candidate, name)
+        if raw is None:
+            return np.asarray([], dtype=str)
+        try:
+            return np.asarray(raw, dtype=str).ravel()
+        except (TypeError, ValueError):
+            return np.asarray([], dtype=str)
+
     return {
-        "best": _get_array(source, "best_score_history", "best_scores", "best_score"),
-        "median": _get_array(source, "median_score_history", "median_scores"),
-        "spread": _get_array(source, "gene_spread_history", "spread_history", "spread"),
-        "population": _get_array(source, "population_history", "populations", "population"),
-        "best_genes": _get_array(source, "best_gene_history", "best_genes_history"),
-        "boundary": _get_array(source, "boundary_hit_history", "boundary_hits"),
+        "best": _get_array(candidate, "best_score_history", "best_scores", "best_score"),
+        "median": _get_array(candidate, "median_score_history", "median_scores"),
+        "spread": _get_array(candidate, "gene_spread_history", "spread_history", "spread"),
+        "population": _get_array(candidate, "population_history", "populations", "population"),
+        "best_genes": _get_array(candidate, "best_gene_history", "best_genes_history"),
+        "boundary": _get_array(candidate, "boundary_hit_history", "boundary_hits"),
+        "immigrants": _get_array(candidate, "immigrant_generations"),
+        "evaluations": _get_array(candidate, "evaluations"),
+        "parameter_names": strings("parameter_names"),
+        "parameter_scales": strings("parameter_scales"),
     }
 
 
@@ -453,8 +500,31 @@ def plot_ga_convergence(result: Any, output_path: PathLike) -> Path:
         score_ax.plot(generations, best, color=_BLUE, lw=1.8, label="Best C-stat")
         if median.size == best.size:
             score_ax.plot(generations, median, color=_ORANGE, lw=1.2, label="Median C-stat")
+            finite_scores = np.concatenate(
+                (best[np.isfinite(best)], median[np.isfinite(median)])
+            )
+            if (
+                finite_scores.size
+                and np.all(finite_scores > 0.0)
+                and np.nanmax(finite_scores) / np.nanmin(finite_scores) > 100.0
+            ):
+                score_ax.set_yscale("log")
         score_ax.set_ylabel("C-statistic")
         score_ax.set_title("Genetic-algorithm convergence")
+        evaluations = np.ravel(history["evaluations"])
+        diagnostic = f"{best.size} saved generations"
+        if evaluations.size:
+            diagnostic += f" | {int(evaluations[-1]):,} evaluations"
+        score_ax.text(
+            0.98,
+            0.96,
+            diagnostic,
+            transform=score_ax.transAxes,
+            ha="right",
+            va="top",
+            color=_GREY,
+            fontsize=8,
+        )
         score_ax.legend(frameon=False)
         score_ax.grid(alpha=0.2)
     else:
@@ -469,11 +539,33 @@ def plot_ga_convergence(result: Any, output_path: PathLike) -> Path:
         spread_ax.plot(np.arange(median_spread.size), median_spread, color=_GREEN, lw=1.6)
         spread_ax.set(xlabel="Generation", ylabel="Median gene spread")
         spread_ax.grid(alpha=0.2)
-        boundary = np.ravel(history["boundary"])
+        boundary = history["boundary"]
+        if boundary.ndim > 1:
+            boundary = np.nansum(boundary, axis=tuple(range(1, boundary.ndim)))
+        boundary = np.ravel(boundary)
         if boundary.size == median_spread.size:
             boundary_ax = spread_ax.twinx()
             boundary_ax.plot(boundary, color=_RED, alpha=0.5, lw=1.0)
             boundary_ax.set_ylabel("Boundary hits", color=_RED)
+            finite_boundary = boundary[np.isfinite(boundary)]
+            upper = float(np.max(finite_boundary)) if finite_boundary.size else 0.0
+            boundary_ax.set_ylim(0.0, max(1.0, upper * 1.1))
+        immigrants = np.ravel(history["immigrants"])
+        for index, generation in enumerate(immigrants):
+            label = "Random immigrants" if index == 0 else None
+            score_ax.axvline(
+                generation,
+                color=_PURPLE,
+                ls="--",
+                lw=0.9,
+                alpha=0.6,
+                label=label,
+            )
+            spread_ax.axvline(
+                generation, color=_PURPLE, ls="--", lw=0.9, alpha=0.6
+            )
+        if immigrants.size:
+            score_ax.legend(frameon=False)
     else:
         _empty(spread_ax, "No population-spread history available")
     return _finish(fig, output_path)
@@ -500,7 +592,35 @@ def plot_population_evolution(
 
     generations = np.arange(population.shape[0])
     dimensions = population.shape[2]
-    names = list(parameter_names or [f"gene {index + 1}" for index in range(dimensions)])
+    saved_names = [str(name) for name in history["parameter_names"]]
+    saved_scales = [str(scale) for scale in history["parameter_scales"]]
+
+    def display_name(index: int) -> str:
+        if index >= len(saved_names):
+            return f"gene {index + 1}"
+        name = saved_names[index].casefold()
+        scale = (
+            saved_scales[index].casefold()
+            if index < len(saved_scales)
+            else "linear"
+        )
+        if name == "tin":
+            return r"$T_{\rm in}$"
+        if name == "gamma":
+            return r"$\Gamma$"
+        if name == "ndisk":
+            return (
+                r"$\log_{10}(N_{\rm disk})$"
+                if scale == "log10"
+                else r"$N_{\rm disk}$"
+            )
+        if name in {"k", "norm", "powerlaw_norm"}:
+            return r"$\log_{10}(K)$" if scale == "log10" else r"$K$"
+        if name == "nh":
+            return r"$N_{\rm H}$"
+        return saved_names[index]
+
+    names = list(parameter_names or [display_name(index) for index in range(dimensions)])
     names.extend(f"gene {index + 1}" for index in range(len(names), dimensions))
     colors = plt.get_cmap("tab10")(np.linspace(0.0, 0.9, max(1, dimensions)))
     best_genes = history["best_genes"]
@@ -516,7 +636,7 @@ def plot_population_evolution(
         xlabel="Generation",
         ylabel="Normalized gene value",
         ylim=(-0.03, 1.03),
-        title="GA population evolution (bands: 10th–90th percentile)",
+        title="GA population evolution (band: 10th–90th; dotted: best)",
     )
     ax.grid(alpha=0.18)
     ax.legend(frameon=False, ncol=min(4, dimensions), fontsize=8)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 import pytest
 
@@ -7,11 +9,13 @@ from evoxrb.genetic import (
     GAConfig,
     GeneticOptimizer,
     bounded_polynomial_mutation,
+    load_ga_checkpoint_history,
     simulated_binary_crossover,
     tournament_select,
 )
 from evoxrb.optimization import latin_hypercube_starts, local_polish
 from evoxrb.parameters import ParameterSpec, SearchSpace
+from evoxrb.plotting import _ga_history, plot_ga_convergence, plot_population_evolution
 
 
 def _quadratic(parameters: dict[str, float]) -> float:
@@ -95,6 +99,56 @@ def test_checkpoint_resume_exactly_matches_uninterrupted_run(tmp_path, suffix: s
     assert np.array_equal(resumed.score_history, uninterrupted.score_history)
     assert np.array_equal(resumed.best_gene_history, uninterrupted.best_gene_history)
     assert resumed.best_score == uninterrupted.best_score
+
+    history = load_ga_checkpoint_history(checkpoint)
+    assert np.array_equal(history["population_history"], resumed.population_history)
+    assert np.array_equal(history["best_score_history"], resumed.best_score_history)
+    assert history["parameter_names"].tolist() == ["x", "y"]
+    if suffix == ".npz":
+        with np.load(checkpoint, allow_pickle=False) as archive:
+            assert "population_history" in archive.files
+            assert "best_score_history" in archive.files
+
+
+def test_plotting_recovers_history_from_legacy_payload_checkpoint(tmp_path) -> None:
+    generations, population_size, dimensions = 4, 6, 2
+    population = np.linspace(
+        0.05, 0.95, generations * population_size * dimensions
+    ).reshape(generations, population_size, dimensions)
+    best_scores = np.array([100.0, 25.0, 9.0, 4.0])
+    state = {
+        "checkpoint_version": 1,
+        "space_signature": (
+            ("tin", 0.05, 2.0, "linear"),
+            ("ndisk", 0.1, 1.0e6, "log10"),
+        ),
+        "histories": {
+            "population": population,
+            "scores": np.tile(best_scores[:, None], (1, population_size)),
+            "best_gene": population[:, 0, :],
+            "best_score": best_scores,
+            "median_score": best_scores * 1.5,
+            "spread": np.std(population, axis=1),
+            "boundary_hits": np.zeros((generations, dimensions), dtype=int),
+        },
+        "immigrant_generations": (2,),
+        "generation": generations - 1,
+        "evaluations": generations * population_size,
+    }
+    checkpoint = tmp_path / "legacy_checkpoint.npz"
+    payload = np.frombuffer(pickle.dumps(state, protocol=5), dtype=np.uint8)
+    np.savez_compressed(checkpoint, payload=payload)
+
+    history = _ga_history(checkpoint)
+    assert np.array_equal(history["population"], population)
+    assert np.array_equal(history["best"], best_scores)
+    assert history["parameter_names"].tolist() == ["tin", "ndisk"]
+    assert history["parameter_scales"].tolist() == ["linear", "log10"]
+
+    convergence = plot_ga_convergence(checkpoint, tmp_path / "convergence.png")
+    evolution = plot_population_evolution(checkpoint, tmp_path / "population.png")
+    assert convergence.stat().st_size > 1_000
+    assert evolution.stat().st_size > 1_000
 
 
 def test_latin_hypercube_and_scipy_polish() -> None:

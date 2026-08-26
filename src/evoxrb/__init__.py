@@ -10,7 +10,7 @@ from __future__ import annotations
 __version__ = "0.1.0"
 SYNTHETIC_LABEL = "Synthetic / NICER-inspired"
 
-from .genetic import GARunResult, GeneticOptimizer
+from .genetic import GARunResult, GeneticOptimizer, load_ga_checkpoint_history
 from .instrument import InstrumentResponse
 from .models import SpectrumModel
 from .objective import Objective
@@ -23,6 +23,7 @@ __all__ = [
     "GARunResult",
     "GeneticOptimizer",
     "InstrumentResponse",
+    "load_ga_checkpoint_history",
     "Objective",
     "ParameterSpec",
     "PosteriorResult",

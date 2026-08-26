@@ -8,6 +8,7 @@ htmlcov/
 .venv/
 build/
 dist/
+tests/
 
 # Reproducible generated products. Aggregate tables and selected figures may be
 # force-added after review, but the default is to regenerate them.
