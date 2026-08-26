@@ -1,5 +1,5 @@
 # EvoXRB
-
+## [Blog post](https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/)
 EvoXRB is a **Synthetic / NICER-inspired** case study in response-folded X-ray
 spectral fitting, global optimization, posterior inference, and timing. It is
 implemented entirely with native Windows Python 3.14 packages—there is no
