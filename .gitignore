@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pytest-tmp*/
+.coverage
+htmlcov/
+.venv/
+build/
+dist/
+
+# Reproducible generated products. Aggregate tables and selected figures may be
+# force-added after review, but the default is to regenerate them.
+data/generated/
+results/runs/
+results/checkpoints/
+results/spectra/
+results/posterior/
+results/timing/lightcurves/
+results/timing/*.npz
+results/instrument_response.npz
+results/stage_state.json

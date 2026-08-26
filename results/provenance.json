@@ -1,0 +1,24 @@
+{
+  "config_hash": "d17357d31d720259",
+  "created_utc": "2026-08-26T00:03:21.367092+00:00",
+  "evoxrb_version": "0.1.0",
+  "fit_channels": 190,
+  "label": "Synthetic / NICER-inspired",
+  "master_seed": 1820070,
+  "packages": {
+    "PyYAML": "6.0.3",
+    "dynesty": "3.1.0",
+    "emcee": "3.1.6",
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scipy": "1.17.1"
+  },
+  "platform": "Windows-11-10.0.26200-SP0",
+  "profile": "full",
+  "python": "3.14.2",
+  "response_shape": [
+    236,
+    600
+  ]
+}

@@ -1,0 +1,88 @@
+project:
+  title: "EvoXRB: Pure-Python Synthetic Case Study"
+  label: "Synthetic / NICER-inspired"
+  master_seed: 1820070
+  output_dir: "results"
+  figure_dir: "figures/generated"
+  report_dir: "reports/generated"
+
+instrument:
+  true_energy_min_keV: 0.1
+  true_energy_max_keV: 12.0
+  true_bins: 600
+  channel_energy_min_keV: 0.2
+  channel_energy_max_keV: 12.0
+  channels: 236
+  fit_energy_min_keV: 0.5
+  fit_energy_max_keV: 10.0
+
+search:
+  nh_fixed: 0.15
+  parameters:
+    - {name: tin, lower: 0.05, upper: 2.0, transform: linear}
+    - {name: ndisk, lower: 0.1, upper: 1000000.0, transform: log10}
+    - {name: gamma, lower: 1.2, upper: 3.5, transform: linear}
+    - {name: norm, lower: 0.000001, upper: 100.0, transform: log10}
+  nh_sensitivity: {name: nh, lower: 0.01, upper: 1.0, transform: log10}
+
+ga:
+  population_size: 192
+  max_generations: 300
+  min_generations: 75
+  tournament_size: 3
+  crossover_probability: 0.9
+  crossover_eta: 15.0
+  mutation_eta_start: 10.0
+  mutation_eta_end: 50.0
+  elite_fraction: 0.03
+  stagnation_generations: 20
+  stop_window: 40
+  stop_improvement: 0.1
+  stop_gene_spread: 0.01
+  immigrant_fraction: 0.05
+  seeds: 5
+
+scipy:
+  starts: 20
+  method: "L-BFGS-B"
+
+posterior:
+  batch_steps: 500
+  max_steps: 20000
+  min_autocorrelation_times: 50
+  autocorrelation_change: 0.01
+  acceptance_min: 0.15
+  acceptance_max: 0.60
+  dynesty_live_points: 400
+  dynesty_dlogz: 0.1
+  boundary_mass_trigger: 0.05
+  mode_delta_c: 2.0
+  mode_separation: 0.1
+
+recovery:
+  high_signal_exposure_s: 100000.0
+  exposure_levels_s: [512.0, 2048.0, 8192.0]
+  realizations: 20
+
+timing:
+  dt_s: 0.001953125
+  segment_s: 512.0
+  bootstrap_samples: 200
+  soft_band_keV: [0.5, 2.0]
+  hard_band_keV: [2.0, 10.0]
+  q_min: 2.0
+  significance_min: 3.0
+
+epochs:
+  - {epoch_id: E01, phase: "hard rise", reference_mjd: 58193.2, tin: 0.20, ndisk: 15000, gamma: 1.55, norm: 0.35, qpo_hz: 0.05, fractional_rms: 0.30}
+  - {epoch_id: E02, phase: "hard plateau", reference_mjd: 58210.0, tin: 0.24, ndisk: 14000, gamma: 1.60, norm: 0.45, qpo_hz: 0.10, fractional_rms: 0.28}
+  - {epoch_id: E03, phase: "hard plateau", reference_mjd: 58235.3, tin: 0.28, ndisk: 13000, gamma: 1.65, norm: 0.50, qpo_hz: 0.20, fractional_rms: 0.26}
+  - {epoch_id: E04, phase: "hard plateau", reference_mjd: 58259.1, tin: 0.32, ndisk: 12000, gamma: 1.70, norm: 0.48, qpo_hz: 0.40, fractional_rms: 0.24}
+  - {epoch_id: E05, phase: "hard decline", reference_mjd: 58275.4, tin: 0.38, ndisk: 11000, gamma: 1.68, norm: 0.40, qpo_hz: 0.80, fractional_rms: 0.22}
+  - {epoch_id: E06, phase: "hard decline", reference_mjd: 58289.1, tin: 0.45, ndisk: 10000, gamma: 1.75, norm: 0.34, qpo_hz: 1.50, fractional_rms: 0.20}
+  - {epoch_id: E07, phase: "intermediate", reference_mjd: 58297.2, tin: 0.55, ndisk: 9000, gamma: 1.95, norm: 0.32, qpo_hz: 3.00, fractional_rms: 0.18}
+  - {epoch_id: E08, phase: "intermediate", reference_mjd: 58302.1, tin: 0.65, ndisk: 8000, gamma: 2.15, norm: 0.27, qpo_hz: 5.00, fractional_rms: 0.15}
+  - {epoch_id: E09, phase: "intermediate", reference_mjd: 58304.3, tin: 0.75, ndisk: 7000, gamma: 2.35, norm: 0.20, qpo_hz: 8.00, fractional_rms: 0.10}
+  - {epoch_id: E10, phase: "soft", reference_mjd: 58330.1, tin: 0.70, ndisk: 7500, gamma: 2.40, norm: 0.06, qpo_hz: null, fractional_rms: 0.03}
+  - {epoch_id: E11, phase: "decay intermediate", reference_mjd: 58390.0, tin: 0.45, ndisk: 9000, gamma: 2.00, norm: 0.12, qpo_hz: 0.50, fractional_rms: 0.12}
+  - {epoch_id: E12, phase: "return hard", reference_mjd: 58403.1, tin: 0.30, ndisk: 11000, gamma: 1.70, norm: 0.20, qpo_hz: 0.20, fractional_rms: 0.20}

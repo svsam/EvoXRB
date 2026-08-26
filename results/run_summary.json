@@ -1,0 +1,27 @@
+{
+  "acceptance_errors": [],
+  "acceptance_valid": true,
+  "config_hash": "d17357d31d720259",
+  "figures": [
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\response_area.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\folded_spectrum.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\ga_convergence.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\ga_population.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\recovery.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\optimizer_comparison.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\posterior.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\hardness_intensity.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\parameter_qpo_evolution.png",
+    "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\figures\\generated\\qpo_gamma.png"
+  ],
+  "fit_results": "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\results\\fit_results.csv",
+  "label": "Synthetic / NICER-inspired",
+  "master_seed": 1820070,
+  "posterior_summary": "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\results\\posterior_summary.csv",
+  "profile": "smoke",
+  "recovery_results": "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\results\\recovery_results.csv",
+  "report": "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\reports\\generated\\case_study.md",
+  "resume": true,
+  "runtime_seconds": 2.814803600000232,
+  "timing_results": "C:\\Users\\svsse\\Downloads\\VSC\\Python\\EvoXRB\\results\\timing_results.csv"
+}

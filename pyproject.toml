@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evoxrb"
+version = "0.1.0"
+description = "A pure-Python synthetic, NICER-inspired genetic-algorithm X-ray case study"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+  "numpy>=2.0",
+  "scipy>=1.14",
+  "pandas>=2.2",
+  "matplotlib>=3.9",
+  "PyYAML>=6.0",
+  "emcee>=3.1.6",
+  "dynesty>=3.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+]
+
+[project.scripts]
+evoxrb = "evoxrb.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --basetemp=.pytest-tmp"
+testpaths = ["tests"]
+markers = [
+  "full: runs the complete synthetic campaign",
+  "slow: computationally expensive validation",
+]
+
+[tool.coverage.run]
+source = ["evoxrb"]
+branch = true
