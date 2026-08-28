@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, TypeAlias
 
 import numpy as np
@@ -19,6 +20,61 @@ from .parameters import SearchSpace
 
 
 DecodedObjective: TypeAlias = Callable[[dict[str, float]], float]
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationSnapshot:
+    """Read-only state emitted after a GA generation has been evaluated.
+
+    Population and gene arrays use normalized coordinates in ``[0, 1]``.
+    Every array is an independent, non-writeable copy, and the decoded best
+    parameters are exposed through an immutable mapping.  A callback can
+    therefore retain or inspect a snapshot without mutating optimizer state.
+    """
+
+    generation: int
+    evaluations: int
+    seed: int
+    population: NDArray[np.float64]
+    scores: NDArray[np.float64]
+    best_genes: NDArray[np.float64]
+    best_parameters: Mapping[str, float]
+    best_score: float
+    median_score: float
+    gene_spread: NDArray[np.float64]
+    boundary_hits: NDArray[np.int64]
+    immigrant_generations: tuple[int, ...] = field(default_factory=tuple)
+    stop_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        for name, dtype in (
+            ("population", np.float64),
+            ("scores", np.float64),
+            ("best_genes", np.float64),
+            ("gene_spread", np.float64),
+            ("boundary_hits", np.int64),
+        ):
+            copied = np.array(getattr(self, name), dtype=dtype, copy=True)
+            copied.setflags(write=False)
+            object.__setattr__(self, name, copied)
+        object.__setattr__(
+            self,
+            "best_parameters",
+            MappingProxyType(
+                {
+                    str(name): float(value)
+                    for name, value in self.best_parameters.items()
+                }
+            ),
+        )
+        object.__setattr__(
+            self,
+            "immigrant_generations",
+            tuple(int(item) for item in self.immigrant_generations),
+        )
+
+
+GenerationCallback: TypeAlias = Callable[[GenerationSnapshot], None]
 
 
 # Human-readable arrays stored alongside the resumable checkpoint payload.  The
@@ -302,18 +358,33 @@ class GeneticOptimizer:
         resume: bool = False,
         initial_population: Sequence[Sequence[float]] | NDArray[np.float64] | None = None,
         generation_limit: int | None = None,
+        on_generation: GenerationCallback | None = None,
+        objective_signature: str | None = None,
     ) -> GARunResult:
         """Run or resume one optimization.
 
         ``generation_limit`` is an absolute, invocation-only pause point useful
         for schedulers and deterministic resume tests.  It does not alter the
         configured mutation schedule or final generation limit.
+
+        ``on_generation`` receives an immutable snapshot for the initial or
+        resumed state and after every newly evaluated generation.  Callback
+        return values are ignored and snapshots never share writable memory
+        with the optimizer.
+
+        ``objective_signature`` binds a checkpoint to caller-defined data and
+        model identity. Generic objectives may omit it, but domain workflows
+        should supply a stable digest before enabling resume.
         """
 
         if generation_limit is not None:
             if generation_limit < 0:
                 raise ValueError("generation_limit cannot be negative")
             generation_limit = min(generation_limit, self.config.max_generations)
+        if objective_signature is not None:
+            objective_signature = str(objective_signature).strip()
+            if not objective_signature:
+                raise ValueError("objective_signature must not be empty")
         path = Path(checkpoint_path) if checkpoint_path is not None else None
         started = time.perf_counter()
 
@@ -321,7 +392,7 @@ class GeneticOptimizer:
             if path is None:
                 raise ValueError("resume=True requires checkpoint_path")
             state = self._load_checkpoint(path)
-            self._validate_checkpoint(state)
+            self._validate_checkpoint(state, objective_signature)
             population = np.asarray(state["population"], dtype=float)
             scores = np.asarray(state["scores"], dtype=float)
             generation = int(state["generation"])
@@ -333,6 +404,21 @@ class GeneticOptimizer:
             immigrant_generations = list(state.get("immigrant_generations", ()))
             prior_runtime = float(state.get("runtime_seconds", 0.0))
             old_reason = state.get("stop_reason")
+            resumed_reason = (
+                str(old_reason)
+                if old_reason == "converged" or generation >= self.config.max_generations
+                else None
+            )
+            self._notify_generation(
+                on_generation,
+                population,
+                scores,
+                generation,
+                evaluations,
+                seed,
+                immigrant_generations,
+                resumed_reason,
+            )
             if old_reason == "converged":
                 return self._make_result(
                     population,
@@ -368,6 +454,7 @@ class GeneticOptimizer:
             histories = self._new_histories(population, scores)
             immigrant_generations: list[int] = []
             prior_runtime = 0.0
+            initial_reason = "paused" if generation_limit == 0 else None
             if path is not None:
                 self._save_checkpoint(
                     path,
@@ -381,9 +468,20 @@ class GeneticOptimizer:
                         histories,
                         immigrant_generations,
                         prior_runtime + time.perf_counter() - started,
-                        "paused" if generation_limit == 0 else None,
+                        initial_reason,
+                        objective_signature,
                     ),
                 )
+            self._notify_generation(
+                on_generation,
+                population,
+                scores,
+                generation,
+                evaluations,
+                seed,
+                immigrant_generations,
+                initial_reason,
+            )
 
         stop_reason: str | None = None
         if generation_limit == 0:
@@ -431,8 +529,19 @@ class GeneticOptimizer:
                         immigrant_generations,
                         elapsed,
                         stop_reason,
+                        objective_signature,
                     ),
                 )
+            self._notify_generation(
+                on_generation,
+                population,
+                scores,
+                generation,
+                evaluations,
+                seed,
+                immigrant_generations,
+                stop_reason,
+            )
             if stop_reason is not None:
                 break
 
@@ -465,8 +574,14 @@ class GeneticOptimizer:
         *,
         checkpoint_directory: str | os.PathLike[str] | None = None,
         resume: bool = False,
+        on_generation: GenerationCallback | None = None,
+        objective_signature: str | None = None,
     ) -> list[GARunResult]:
-        """Run independent GA seeds in deterministic sequence."""
+        """Run independent GA seeds in deterministic sequence.
+
+        When supplied, ``on_generation`` observes every seed; snapshots carry
+        the active seed so callers can keep their progress streams separate.
+        """
 
         directory = Path(checkpoint_directory) if checkpoint_directory is not None else None
         if directory is not None:
@@ -480,6 +595,8 @@ class GeneticOptimizer:
                     seed=int(seed),
                     checkpoint_path=path,
                     resume=resume and path is not None and path.exists(),
+                    on_generation=on_generation,
+                    objective_signature=objective_signature,
                 )
             )
         return results
@@ -590,6 +707,39 @@ class GeneticOptimizer:
             "boundary_hits": boundary_hits.astype(np.int64),
         }
 
+    def _notify_generation(
+        self,
+        callback: GenerationCallback | None,
+        population: NDArray[np.float64],
+        scores: NDArray[np.float64],
+        generation: int,
+        evaluations: int,
+        seed: int,
+        immigrant_generations: Sequence[int],
+        stop_reason: str | None,
+    ) -> None:
+        if callback is None:
+            return
+        state = self._snapshot(population, scores)
+        best_genes = np.asarray(state["best_gene"], dtype=np.float64)
+        callback(
+            GenerationSnapshot(
+                generation=int(generation),
+                evaluations=int(evaluations),
+                seed=int(seed),
+                population=np.asarray(state["population"], dtype=np.float64),
+                scores=np.asarray(state["scores"], dtype=np.float64),
+                best_genes=best_genes,
+                best_parameters=self.search_space.decode(best_genes),
+                best_score=float(state["best_score"]),
+                median_score=float(state["median_score"]),
+                gene_spread=np.asarray(state["spread"], dtype=np.float64),
+                boundary_hits=np.asarray(state["boundary_hits"], dtype=np.int64),
+                immigrant_generations=tuple(immigrant_generations),
+                stop_reason=stop_reason,
+            )
+        )
+
     def _new_histories(
         self,
         population: NDArray[np.float64],
@@ -653,11 +803,13 @@ class GeneticOptimizer:
         immigrant_generations: Sequence[int],
         runtime_seconds: float,
         stop_reason: str | None,
+        objective_signature: str | None,
     ) -> dict[str, Any]:
         return {
             "checkpoint_version": self.CHECKPOINT_VERSION,
             "space_signature": self.search_space.signature,
             "config_signature": self._config_signature(),
+            "objective_signature": objective_signature,
             "population": population,
             "scores": scores,
             "generation": generation,
@@ -676,13 +828,29 @@ class GeneticOptimizer:
         signature.pop("max_generations")
         return signature
 
-    def _validate_checkpoint(self, state: Mapping[str, Any]) -> None:
+    def _validate_checkpoint(
+        self,
+        state: Mapping[str, Any],
+        objective_signature: str | None,
+    ) -> None:
         if state.get("checkpoint_version") != self.CHECKPOINT_VERSION:
             raise ValueError("unsupported GA checkpoint version")
         if tuple(tuple(item) for item in state.get("space_signature", ())) != self.search_space.signature:
             raise ValueError("checkpoint search space does not match optimizer")
         if state.get("config_signature") != self._config_signature():
             raise ValueError("checkpoint GA configuration does not match optimizer")
+        saved_signature = state.get("objective_signature")
+        if saved_signature is not None:
+            if objective_signature is None:
+                raise ValueError(
+                    "checkpoint requires its objective signature when resuming"
+                )
+            if saved_signature != objective_signature:
+                raise ValueError("checkpoint objective/data does not match current run")
+        elif objective_signature is not None:
+            raise ValueError(
+                "checkpoint has no objective signature; start a fresh run"
+            )
         population = np.asarray(state.get("population"), dtype=float)
         expected = (self.config.population_size, self.search_space.ndim)
         if population.shape != expected:

@@ -1,0 +1,635 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=27mm]{geometry}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+\definecolor{EvoGreen}{HTML}{168761}
+\definecolor{EvoDark}{HTML}{20272C}
+\definecolor{EvoMuted}{HTML}{5F6B73}
+\definecolor{EvoPanel}{HTML}{F2F6F4}
+\definecolor{EvoWarning}{HTML}{FFF8DE}
+\definecolor{EvoRule}{HTML}{CBD5D0}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=EvoGreen,
+  urlcolor=EvoGreen,
+  citecolor=EvoGreen,
+  pdftitle={EvoXRB v0.2.0: Watching a Genetic Algorithm Fit an X-ray Spectrum},
+  pdfauthor={Sam Seifi},
+  pdfsubject={A continuation of the EvoXRB project blog},
+  pdfkeywords={genetic algorithm, X-ray astronomy, SciPy, Matplotlib, spectral fitting}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{EvoMuted}{EvoXRB / Part II}}
+\fancyhead[R]{\small\textcolor{EvoMuted}{v0.2.0}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{EvoRule}\leaders\hrule height \headrulewidth\hfill}}
+\setlength{\headheight}{14pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.78em}
+\setlist{itemsep=0.35em,topsep=0.4em}
+\captionsetup{font=small,labelfont=bf}
+\graphicspath{{../assets/}}
+
+% Support the documented article-directory build and a build launched from the
+% EvoXRB repository root.
+\def\EvoComparisonPath{}
+\IfFileExists{../assets/e08-ga-comparison.png}{%
+  \renewcommand{\EvoComparisonPath}{../assets/e08-ga-comparison.png}%
+}{%
+  \IfFileExists{website/evoxrb-v0.2.0/assets/e08-ga-comparison.png}{%
+    \renewcommand{\EvoComparisonPath}{website/evoxrb-v0.2.0/assets/e08-ga-comparison.png}%
+  }{}%
+}
+
+\lstdefinestyle{evoxrb}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{EvoPanel},
+  frame=single,
+  rulecolor=\color{EvoRule},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  aboveskip=0.8em,
+  belowskip=0.8em
+}
+\lstset{style=evoxrb}
+
+\newenvironment{scopebox}[1][Scope]
+{%
+  \begin{center}
+  \begin{minipage}{0.92\linewidth}
+  \color{EvoDark}
+  \hrule height 1pt
+  \vspace{0.55em}
+  \textbf{\textcolor{EvoGreen}{#1}}\par
+  \small
+}
+{%
+  \par\vspace{0.3em}
+  \hrule height 1pt
+  \end{minipage}
+  \end{center}
+}
+
+\newenvironment{warningbox}
+{%
+  \begin{center}
+  \begin{minipage}{0.92\linewidth}
+  \color{EvoDark}
+  \hrule height 1pt
+  \vspace{0.55em}
+  \textbf{\textcolor{EvoGreen}{Calibration boundary}}\par
+  \small
+}
+{%
+  \par\vspace{0.3em}
+  \hrule height 1pt
+  \end{minipage}
+  \end{center}
+}
+
+\title{\vspace{-1.6cm}
+  {\small\color{EvoGreen}\MakeUppercase{Computational astrophysics / Project blog / Part II}}\\[0.8em]
+  \textbf{EvoXRB v0.2.0: Watching a Genetic Algorithm Fit an X-ray Spectrum}
+}
+\author{Sam Seifi}
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\begin{minipage}{0.86\linewidth}
+\large
+The first version saved the winning numbers. The second lets me watch thirty-two
+synthetic organisms argue with a Poisson spectrum, one generation at a time.
+\end{minipage}
+\end{center}
+
+\begin{scopebox}
+EvoXRB v0.2.0 remains a declared synthetic / NICER-inspired experiment. The
+response, background and target counts discussed here are educational products
+generated in Python. The purple open circles are a separate real MAXI/GSC
+spectrum of MAXI J1820+070. They provide observational context, but they are
+never used in the C-statistic or residuals and are not a real NICER fit.
+\end{scopebox}
+
+\section*{Introduction}
+
+The first EvoXRB post ended with a sentence I liked:
+
+\begin{quote}
+\textit{You can watch the search happen.}
+\end{quote}
+
+There was only one small problem.
+
+You could not actually watch the search happen.
+
+Version 0.1.0 saved convergence histories, gene spreads and final figures. That
+was enough to reconstruct the behaviour of the genetic algorithm after the
+calculation had finished. It was rather like receiving a very detailed report
+from an expedition while being told that the windows on the vehicle were an
+optional feature planned for the next release.
+
+Version 0.2.0 adds the windows.
+
+Every evaluated generation can now emit a snapshot of the population. The best
+genes in that snapshot are decoded back into astrophysical parameters, passed
+through the same photon model, folded through the same synthetic response and
+drawn against the same Poisson counts used by the objective.
+
+The result can update live while the optimiser is calculating. It can also be
+saved as a replay with play, pause, step, loop and timeline controls.
+
+This sounds like a presentation feature.
+
+It is.
+
+It also became a much more direct test of whether the calculation was doing what
+I thought it was doing.
+
+\section{What actually changed in v0.2.0?}
+
+The optimiser remains a real-valued genetic algorithm. There is no prerecorded
+sequence pretending to evolve and no linearly interpolated spectrum being
+nudged towards the answer because it looks pleasing in a GIF.
+
+The population still passes through tournament selection, simulated-binary
+crossover, bounded polynomial mutation, elitism and, when stagnation rules
+allow it, random immigration. Every candidate is decoded from a normalized
+chromosome
+
+\begin{equation}
+  \mathbf{g} = [g_1,g_2,g_3,g_4], \qquad 0 \leq g_j \leq 1,
+\end{equation}
+
+into the physical parameter vector
+
+\begin{equation}
+  \boldsymbol{\theta} =
+  [T_{\mathrm{in}},N_{\mathrm{disk}},\Gamma,K].
+\end{equation}
+
+The two normalizations use logarithmic transforms, because treating a mutation
+near 1 and a mutation near 10,000 as the same additive event is a good way to
+turn numerical conditioning into performance art.
+
+The new part is observational rather than reproductive. The optimiser reports
+its state after generation zero and after every newly evaluated generation.
+Each snapshot contains:
+
+\begin{itemize}
+  \item the normalized population and its scores;
+  \item the best genes and their decoded parameters;
+  \item the best and median C-statistic;
+  \item gene spread and boundary-hit diagnostics;
+  \item the evaluation count, random seed and stopping state.
+\end{itemize}
+
+Those arrays are independent read-only copies. A callback may inspect the gene
+pool, draw it or preserve it. It cannot reach back into the optimiser and give
+its favourite organism a slightly more advantageous disk temperature.
+
+That would be less natural selection and more suspiciously interventionist
+gardening.
+
+\section{Turning a generation into an X-ray spectrum}
+
+A population history is not automatically a spectral history.
+
+The GA works in normalized coordinates. The detector plot needs expected counts
+per channel. Connecting the two requires the full forward model for every frame:
+
+\begin{equation}
+  \mathbf{g}^{(m)}_{\mathrm{best}}
+  \longrightarrow
+  \boldsymbol{\theta}^{(m)}_{\mathrm{best}}
+  \longrightarrow
+  S(E\mid\boldsymbol{\theta}^{(m)}_{\mathrm{best}})
+  \longrightarrow
+  \boldsymbol{\mu}^{(m)}.
+\end{equation}
+
+Here $m$ is the generation index, $S(E\mid\boldsymbol{\theta})$ is the
+educational photon model and $\boldsymbol{\mu}$ is the response-folded expected
+detector count vector.
+
+The folding step remains
+
+\begin{equation}
+  \mu_i = t_{\mathrm{exp}}
+  \sum_j R_{ij}\,A_j\,S(E_j\mid\boldsymbol{\theta})\,\Delta E_j
+  + t_{\mathrm{exp}}\,b_i\,\Delta E_i,
+\end{equation}
+
+where $A_j$ is the effective area, $R_{ij}$ is the redistribution probability
+from true-energy bin $j$ to detector channel $i$, and $b_i$ is the synthetic
+background rate density.
+
+The animation does not compare one smooth theoretical curve with another. It
+repeats the actual detector prediction used by the objective.
+
+For a sampled subset of the population, the same calculation produces either
+individual population curves or a 10th--90th percentile envelope. That envelope
+is deliberately described as a sampled population envelope.
+
+It is not a credible interval.
+
+The GA population is not a posterior distribution, no matter how attractively
+Matplotlib shades it.
+
+\section{How to read the replay}
+
+The saved replay contains four connected views.
+
+\subsection*{The folded spectrum}
+
+The main panel shows the synthetic Poisson count-rate density, the current best
+response-folded model and the sampled population envelope. This is the most
+direct view of the phenotype produced by the current chromosome. Purple open
+circles show the real MAXI/GSC reference on its native 2--10 keV grid. They are
+context, not extra members of the fitness calculation.
+
+\subsection*{The residuals}
+
+The second panel uses Pearson-style residuals,
+
+\begin{equation}
+  r_i = \frac{n_i-\mu_i}{\sqrt{\max(\mu_i,1)}}.
+\end{equation}
+
+Channels outside the 0.5--10 keV objective band remain visible and are shaded.
+They are not included in the C-statistic, but removing them from the figure
+would make the detector appear to end exactly where the analysis becomes
+convenient. The MAXI/GSC points do not enter this panel either: a raw difference
+between two instruments is not a residual.
+
+\subsection*{The score history}
+
+The third panel follows both the best and median C-statistic. A champion can
+improve while the rest of the population remains scattered across several bad
+regions. Watching the median makes that harder to miss.
+
+\subsection*{The decoded parameters}
+
+The final panel reports the current values of $T_{\mathrm{in}}$,
+$N_{\mathrm{disk}}$, $\Gamma$ and $K$. A falling score is useful. Seeing which
+physical trade-off produced it is more useful.
+
+The frame is therefore not four unrelated diagnostic plots sharing a timestamp.
+Every panel refers to the same evaluated generation.
+
+This is a surprisingly easy invariant to lose once plotting code becomes
+enthusiastic.
+
+\section{What did the E08 smoke run actually show?}
+
+The demonstration run uses the smoke profile: 32 individuals and 24 evolved
+generations. The raw GA consumes 800 objective evaluations, including the
+initial population; the L-BFGS-B polish adds another 222. The replay contains
+25 frames because generation zero is a scientifically meaningful state rather
+than an inconvenient preface.
+
+The headline results are shown in Table~\ref{tab:e08}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Injected and fitted parameters for the E08 synthetic smoke run.}
+  \label{tab:e08}
+  \small
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Stage & $T_{\mathrm{in}}$ & $N_{\mathrm{disk}}$ & $\Gamma$ & $K$ & C-stat \\
+    \midrule
+    Synthetic truth       & 0.650000 & 8000.00 & 2.15000 & 0.270000 & -- \\
+    Raw 24-generation GA  & 0.787671 & 1683.73 & 2.36647 & 0.388871 & 2079.873 \\
+    GA + SciPy L-BFGS-B   & 0.648885 & 8060.95 & 2.15046 & 0.269375 & 180.495 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The raw GA did not converge. It reached the smoke profile's maximum generation
+with C-stat 2079.873.
+
+That is not a minor implementation detail hidden in a JSON file.
+
+It is the result.
+
+The population found a useful region, but the champion had not resolved the
+strong trade-off between disk temperature, disk normalization, photon index and
+continuum normalization. The animation makes this much more obvious than a
+single final parameter row.
+
+Bounded SciPy L-BFGS-B then started from that champion and reached C-stat
+180.495. The retained polished parameters lie extremely close to the injected
+values.
+
+This does not prove that the GA defeated SciPy.
+
+It demonstrates a hybrid division of labour. The population searches globally
+for a useful basin. A local bounded method finishes the numerical sentence more
+efficiently than asking mutation to place the final decimal points.
+
+\ifx\EvoComparisonPath\empty
+  \begin{scopebox}[Figure unavailable]
+  Run \texttt{python scripts/build\_blog\_bundle.py} before compiling this
+  document to place the generated comparison image in \texttt{../assets/}.
+  \end{scopebox}
+\else
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{\EvoComparisonPath}
+    \caption{Static E08 comparison. The upper panel overlays the synthetic
+    target, the raw GA model, the GA + SciPy model and the real MAXI/GSC
+    reference as purple open circles. The lower panel shows Pearson residuals
+    for the synthetic target and models only, and shades detector channels
+    outside the objective fit band. The real points are not included in the
+    reported C-statistic or residuals.}
+    \label{fig:comparison}
+  \end{figure}
+\fi
+
+\section{Live calculation and saved replay are different jobs}
+
+The live viewer is attached directly to the generation callback. On an
+interactive Matplotlib backend it updates the current spectrum and residuals
+while the optimiser is still calculating.
+
+That answers a very immediate question:
+
+\begin{quote}
+What is the optimiser doing now?
+\end{quote}
+
+The saved replay is built from the completed population history. It works in a
+headless environment and can be exported as HTML, GIF through Pillow, or MP4
+when FFmpeg is available.
+
+That answers a different question:
+
+\begin{quote}
+What exactly did this run do?
+\end{quote}
+
+The two paths use the same model evaluation, but they have different failure
+modes. A live GUI depends on an interactive desktop backend. A saved file needs
+to preserve every frame, avoid silently exceeding an embed limit and remain
+useful after the Python process has ended.
+
+The HTML writer produces a convenient self-contained Matplotlib fragment. For
+the copy-ready website bundle, a small compiler extracts its 25 embedded PNG
+frames, writes them as ordinary assets and replaces the inline player with
+external CSS and JavaScript.
+
+This removes the base64 overhead, permits a strict content-security policy and
+adds a labelled timeline, keyboard-operable buttons, a paused initial state and
+a static fallback.
+
+Scientific Python is very good at making figures.
+
+It is not automatically good at making those figures behave politely inside
+somebody else's website.
+
+\section{Where does real data enter?}
+
+This is the section where it would be very easy to overstate what changed.
+
+The replay includes a real MAXI/GSC spectrum of MAXI J1820+070 produced by the
+official RIKEN/JAXA MAXI on-demand service. It covers MJD
+58301.5--58302.5, close to the synthetic E08 anchor at MJD 58302.1, with
+1539.5 seconds of exposure. The response EBOUNDS channels were grouped into 16
+half-keV display bins across 2--10 keV.
+
+That band contains 3004 source-region counts and 330 background-region counts.
+The background is scaled using the source and background exposures and
+\texttt{BACKSCAL} values before subtraction. The plotted errors propagate the
+source and scaled-background Poisson uncertainties.
+
+The derived CSV, exact request and provenance record travel with the website
+bundle. The official result, including the source spectrum, background spectrum
+and response, is available at
+\url{https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html}.
+
+Version 0.2.0 can also load another observational spectrum from CSV and draw it
+on its native energy grid beside the evolving synthetic fit. The preferred
+schema is:
+
+The preferred schema is:
+
+\begin{lstlisting}
+energy_keV,count_rate_density,count_rate_error
+0.55,42.7,1.3
+0.60,47.1,1.4
+...
+\end{lstlisting}
+
+A counts table can instead provide \texttt{counts}, \texttt{exposure\_s} and
+either \texttt{bin\_width\_keV} or lower and upper energy edges. Counts are
+converted to count-rate density for plotting.
+
+But the real spectrum remains a visual overlay only. The synthetic target is
+what the GA and bounded SciPy L-BFGS-B fit. The MAXI values never change
+selection and never enter the objective or the residual calculation.
+
+\begin{warningbox}
+\textbf{Two count-rate spectra on one axis are not automatically the same
+measurement.}
+
+A physical cross-instrument comparison needs the matching source and background
+products, exposures, responses, effective areas, calibration choices and
+likelihood treatment for each instrument. The vertical separation between the
+MAXI/GSC points and the NICER-inspired synthetic model is therefore not a model
+residual. EvoXRB deliberately refuses to turn that raw overlay into a fit
+statistic.
+\end{warningbox}
+
+The reference makes the comparison real. The boundary around what was fitted
+makes it accurate. The purpose of the loader is to preserve the distinction
+between ``this curve can be drawn'' and ``this dataset has been calibrated well
+enough to fit.''
+
+Those are not the same claim.
+
+\textbf{Acknowledgment:} This research has made use of MAXI data provided by
+RIKEN, JAXA and the MAXI team.
+
+\section{Checkpointing without changing the experiment}
+
+A long genetic-algorithm run should be resumable.
+
+It should not be resumable against different data while pretending that nothing
+changed.
+
+The animated workflow therefore binds each checkpoint to an objective signature
+covering:
+
+\begin{itemize}
+  \item the case-study configuration and continuum choice;
+  \item the target counts, exposure and fit mask;
+  \item the true and detector energy grids and bin edges;
+  \item effective area, redistribution matrix and background.
+\end{itemize}
+
+A signed checkpoint can only resume when the same signature is supplied. Old
+generic checkpoints without signatures remain usable by generic callers, but a
+domain workflow does not get to omit the signature after one has been recorded.
+
+This is intentionally conservative.
+
+Reusing a population is easy. Reusing cached objective values after changing
+the response is wrong.
+
+The run summary records both the short configuration digest and the complete
+objective signature. The website compiler then emits selected public metadata
+without absolute workstation paths or checkpoint locations.
+
+Reproducibility is not improved by publishing the name of my Windows user
+directory.
+
+\section{Running and publishing it}
+
+From the repository root, the normal smoke replay is generated with:
+
+\begin{lstlisting}[language=bash]
+python -m pip install -e ".[test]"
+python -m evoxrb animate --profile smoke --epoch E08
+\end{lstlisting}
+
+The calculation can be watched live with:
+
+\begin{lstlisting}[language=bash]
+python -m evoxrb animate --profile smoke --epoch E08 --live
+\end{lstlisting}
+
+A user reference can be added with:
+
+\begin{lstlisting}[language=bash]
+python -m evoxrb animate \
+  --profile smoke \
+  --epoch E08 \
+  --reference-csv data/reference/maxi_j1820p070_mjd58302.csv
+\end{lstlisting}
+
+The website bundle is compiled from the generated replay with:
+
+\begin{lstlisting}[language=bash]
+python -m evoxrb animate --profile smoke --epoch E08 --reference-csv data/reference/maxi_j1820p070_mjd58302.csv --output results/animations/E08_ga_spectra.html --comparison-output results/animations/E08_ga_comparison.png
+python scripts/build_blog_bundle.py
+python -m http.server 8000 --directory website/evoxrb-v0.2.0
+\end{lstlisting}
+
+The output uses relative paths and no remote runtime dependencies. Copying the
+entire \texttt{website/evoxrb-v0.2.0} directory into a static website repository
+moves the article, accessible replay, 25 frames, comparison plot, sanitized run
+metadata and this LaTeX source together.
+
+The source can be compiled with a conventional portable pdfLaTeX toolchain:
+
+\begin{lstlisting}[language=bash]
+cd website/evoxrb-v0.2.0/article
+latexmk -pdf evoxrb-v0.2.0.tex
+\end{lstlisting}
+
+Running \texttt{pdflatex} twice is also sufficient when \texttt{latexmk} is not
+available.
+
+\section{So, did adding an animation improve the science?}
+
+Did it make the raw smoke-profile GA converge?
+
+\textbf{No.}
+
+Did it make the algorithm look more competent than the scores say it was?
+
+\textbf{Also no.} The structured residuals are now much harder to ignore.
+
+Did it make the relationship between population search, parameter degeneracy
+and local polishing easier to understand?
+
+\textbf{Yes.}
+
+Did it actually place a real reference spectrum beside the synthetic experiment
+without quietly pretending that the educational response calibrated it?
+
+\textbf{Yes.}
+
+The next important step is still the one identified in Part I: increase the
+difficulty of the likelihood landscape, then eventually replace the synthetic
+products with a properly reduced observation and its matching calibration
+files.
+
+A four-parameter educational model remains a friendly problem by astronomical
+standards. The stronger test will involve more physical Comptonization and
+reflection components, background and calibration uncertainty, cross-instrument
+constants, additional nuisance parameters and the multimodality that tends to
+arrive once a model becomes interesting.
+
+But v0.2.0 makes the intermediate experiment observable.
+
+That matters because optimisation is not only a machine for producing a final
+row of parameters.
+
+It is a process.
+
+And processes are much easier to trust when they are allowed to leave evidence.
+
+\section{References and further reading}
+
+\begin{enumerate}[label={[\arabic*]}]
+  \item S. Seifi, \textit{EvoXRB: Genetic Algorithms, and a Very Real Black
+  Hole} (2026). Part I:
+  \url{https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/}.
+
+  \item W. Cash, \textit{Parameter estimation in astronomy through application
+  of the likelihood ratio}, Astrophysical Journal 228, 939 (1979).
+  \url{https://ntrs.nasa.gov/citations/19790043693}.
+
+  \item SciPy documentation, \textit{minimize(method='L-BFGS-B')}.
+  \url{https://docs.scipy.org/doc/scipy/reference/optimize.minimize-lbfgsb.html}.
+
+  \item Matplotlib documentation, \textit{Animation API and writer classes}.
+  \url{https://matplotlib.org/stable/api/animation_api.html}.
+
+  \item NASA HEASARC, \textit{NICER analysis documentation}.
+  \url{https://heasarc.gsfc.nasa.gov/docs/nicer/}.
+
+  \item M. Matsuoka et al., \textit{The MAXI Mission on the ISS: Science and
+  Instruments for Monitoring All-Sky X-Ray Images}, Publications of the
+  Astronomical Society of Japan 61, 999 (2009).
+  \url{https://ui.adsabs.harvard.edu/abs/2009PASJ...61..999M/abstract}.
+
+  \item RIKEN, JAXA and the MAXI team, \textit{MAXI on-demand processing:
+  MAXI J1820+070, MJD 58301.5--58302.5}.
+  \url{https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html}.
+\end{enumerate}
+
+\vfill
+\begin{center}
+\small\textcolor{EvoMuted}{
+EvoXRB v0.2.0 --- synthetic / NICER-inspired --- Part II
+}
+\end{center}
+
+\end{document}

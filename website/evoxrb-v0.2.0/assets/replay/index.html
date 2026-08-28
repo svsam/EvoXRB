@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>EvoXRB generation-by-generation spectral replay</title>
+  <link rel="stylesheet" href="replay.css">
+  <script src="manifest.js" defer></script>
+  <script src="replay.js" defer></script>
+</head>
+<body>
+  <main class="replay" aria-labelledby="replay-title">
+    <header class="replay__header">
+      <p class="replay__eyebrow">Synthetic / NICER-inspired</p>
+      <h1 id="replay-title">Generation-by-generation spectral fit</h1>
+      <p id="replay-description">
+        The four panels show the folded spectrum, Pearson residuals, population
+        C-statistic and decoded best parameters. Purple points are a real
+        MAXI/GSC visual reference. The replay begins paused.
+      </p>
+    </header>
+
+    <figure class="replay__figure" aria-describedby="replay-description replay-status">
+      <img
+        id="replay-frame"
+        src="frames/frame-000.png"
+        alt="EvoXRB synthetic GA spectral fit at generation 0"
+        width="1320"
+        height="825"
+        decoding="async"
+      >
+      <figcaption id="replay-status">
+        Generation 0 of 24
+      </figcaption>
+    </figure>
+
+    <section class="controls" aria-label="Replay controls">
+      <label class="controls__timeline" for="generation-slider">
+        <span>Generation</span>
+        <output id="generation-output" for="generation-slider">0 / 24</output>
+      </label>
+      <input
+        id="generation-slider"
+        type="range"
+        min="0"
+        max="24"
+        step="1"
+        value="0"
+        aria-valuemin="0"
+        aria-valuemax="24"
+        aria-valuenow="0"
+        aria-valuetext="Generation 0 of 24"
+      >
+
+      <div class="controls__buttons">
+        <button type="button" data-action="first" aria-label="First generation">First</button>
+        <button type="button" data-action="previous" aria-label="Previous generation">Previous</button>
+        <button type="button" data-action="play" aria-label="Play replay">Play</button>
+        <button type="button" data-action="pause" aria-label="Pause replay">Pause</button>
+        <button type="button" data-action="next" aria-label="Next generation">Next</button>
+        <button type="button" data-action="last" aria-label="Last generation">Last</button>
+      </div>
+
+      <div class="controls__settings">
+        <label for="replay-speed">Playback speed</label>
+        <select id="replay-speed">
+          <option value="2">2 frames/s</option>
+          <option value="4">4 frames/s</option>
+          <option value="8" selected>8 frames/s</option>
+        </select>
+        <label class="controls__loop" for="replay-loop">
+          <input id="replay-loop" type="checkbox" checked>
+          Loop
+        </label>
+      </div>
+    </section>
+
+    <p class="replay__scope">
+      The fit target is synthetic. Real MAXI/GSC points are a cross-instrument
+      visual overlay and were not included in the fit.
+    </p>
+    <p id="replay-announcement" class="visually-hidden" aria-live="polite"></p>
+  </main>
+</body>
+</html>

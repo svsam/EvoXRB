@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="EvoXRB v0.2.0 turns a real-valued genetic-algorithm X-ray fit into a live and replayable generation-by-generation experiment.">
+  <meta name="theme-color" content="#0c0c0c">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'">
+  <title>/ SvS / EvoXRB v0.2.0: Watching a Genetic Algorithm Fit an X-ray Spectrum</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+
+<body>
+  <a class="skipLink" href="#article-body">Skip to article</a>
+  <main class="blogPostContent">
+    <article class="blogPostProfile" aria-labelledby="postTitle">
+      <header class="devHeader">
+        <nav class="devNav" aria-label="Primary navigation">
+          <a href="https://svsam.com/">Home</a>
+          <a href="https://svsam.com/about/">About</a>
+          <a href="https://svsam.com/projects/">Projects</a>
+          <a href="https://svsam.com/blog/" aria-current="page">Blog</a>
+        </nav>
+      </header>
+
+      <section class="blogPostTextBox">
+        <header class="blogPostHeader">
+          <p class="blogPostKicker">Computational astrophysics / Project blog / Part II</p>
+          <h1 class="title" id="postTitle">EvoXRB v0.2.0: Watching a Genetic Algorithm Fit an X-ray Spectrum</h1>
+          <time class="blogPostDate" datetime="2026-08-27">August 2026</time>
+          <p class="blogPostDek">The first version saved the winning numbers. The second lets me watch thirty-two synthetic organisms argue with a Poisson spectrum, one generation at a time.</p>
+
+          <div class="blogPostActions" aria-label="Project links">
+            <a href="https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/">Read Part I</a>
+            <a href="https://github.com/svsam/EvoXRB">Project repository</a>
+            <a href="article/evoxrb-v0.2.0.tex">LaTeX edition</a>
+            <a href="assets/e08-run-summary.json">Public run metadata</a>
+            <a href="assets/maxi-j1820-reference.csv">MAXI/GSC reference CSV</a>
+            <a href="assets/maxi-j1820-reference.provenance.json">MAXI/GSC provenance</a>
+          </div>
+        </header>
+
+        <div class="blogPostBody" id="article-body">
+          <aside class="blogPostCallout" aria-label="Scope note">
+            <strong>Scope</strong>
+            <p>EvoXRB v0.2.0 remains a declared synthetic / NICER-inspired fitting experiment. The response, background and target counts evaluated by the GA and SciPy are educational products generated in Python. The purple open circles are a separate real MAXI/GSC spectrum of MAXI J1820+070, included as a visual reference and never used in the C-statistic or residuals.</p>
+          </aside>
+
+          <section aria-labelledby="introduction">
+            <h2 id="introduction">Introduction</h2>
+            <p>The first EvoXRB post ended with a sentence I liked:</p>
+            <blockquote>You can watch the search happen.</blockquote>
+            <p>There was only one small problem.</p>
+            <p>You could not actually watch the search happen.</p>
+            <p>The code saved convergence histories, population spreads and final figures, which is enough to reconstruct what the genetic algorithm did after the event. It was rather like receiving a detailed report from an expedition while being told that the windows on the vehicle were an optional feature planned for the next release.</p>
+            <p>Version 0.2.0 adds the windows.</p>
+            <p>Every evaluated generation can now emit an immutable snapshot of the population. That snapshot is converted back into astrophysical parameters, folded through the synthetic detector response and drawn against the same Poisson counts used by the objective.</p>
+            <p>The result can update live while the calculation runs, or it can be saved as a replay with play, pause, step, loop and timeline controls.</p>
+            <p>This sounds like a presentation feature.</p>
+            <p>It is.</p>
+            <p>It also turned out to be a very useful way of finding out whether the algorithm was doing what I thought it was doing.</p>
+          </section>
+
+          <section aria-labelledby="what-changed">
+            <h2 id="what-changed">1. What actually changed in v0.2.0?</h2>
+            <p>The optimiser itself remains a real-valued genetic algorithm. There is no prerecorded sequence pretending to evolve and no random curve being nudged towards the answer for dramatic effect.</p>
+            <p>A population still passes through tournament selection, simulated-binary crossover, bounded polynomial mutation, elitism and occasional random immigration. Every candidate is decoded into physical parameters and evaluated with the response-folded Poisson objective.</p>
+            <p>The difference is that the optimiser now reports its state after generation zero and after every newly evaluated generation.</p>
+            <p>Each snapshot contains:</p>
+            <ul>
+              <li>the normalized population and its scores,</li>
+              <li>the best genes and decoded parameters,</li>
+              <li>the best and median C-statistic,</li>
+              <li>gene spread and boundary hits,</li>
+              <li>the evaluation count, seed and stopping state.</li>
+            </ul>
+            <p>The arrays are copies and are read-only. A plot is allowed to observe evolution. It is not allowed to reach back into the gene pool and improve its favourite organism by hand.</p>
+            <p>That would be less natural selection and more suspiciously interventionist gardening.</p>
+          </section>
+
+          <section aria-labelledby="watch-run">
+            <h2 id="watch-run">2. The experiment, now with moving parts</h2>
+            <p>The replay below contains generation zero followed by twenty-four evolved generations from the E08 smoke-profile run. It starts paused, because a scientific figure should not begin moving merely because somebody scrolled near it.</p>
+
+            <div class="evoxrbMediaWide">
+              <iframe
+                class="evoxrbReplay"
+                data-evoxrb-replay
+                src="assets/replay/index.html"
+                title="Interactive replay of the EvoXRB E08 synthetic genetic-algorithm fit with a separate real MAXI/GSC visual reference"
+                loading="lazy"
+                sandbox="allow-scripts"
+              ></iframe>
+              <noscript>
+                <figure>
+                  <img src="assets/e08-ga-comparison.png" alt="Static EvoXRB comparison showing the synthetic target, raw genetic-algorithm model, SciPy-polished model, a separate real MAXI/GSC spectrum in purple open circles, and Pearson residuals calculated only from the synthetic target" width="1507" height="1209">
+                  <figcaption>JavaScript is disabled, so the static final comparison is shown instead. The purple MAXI/GSC points are a visual overlay; the fitted target and residuals remain synthetic.</figcaption>
+                </figure>
+              </noscript>
+            </div>
+
+            <p>The top-left panel contains the synthetic count-rate spectrum, the best response-folded model and a sampled 10th--90th percentile envelope from the population. Purple open circles add the real MAXI/GSC spectrum on its own 2--10 keV energy grid. The envelope is not a posterior interval, and the purple points are not extra fitness data. They are two different kinds of context sharing one axis.</p>
+            <p>The lower-left panel shows Pearson residuals for the synthetic target and synthetic model only, with the channels outside the 0.5--10 keV objective band shaded. The purple MAXI/GSC points do not enter this panel. Their raw separation from a NICER-inspired model is not a model residual, because the two instruments do not share a response.</p>
+            <p>The top-right panel follows the best and median C-statistic. Watching both matters. A single champion can improve while the rest of the population remains scattered across several bad regions.</p>
+            <p>The final panel decodes the current champion into <var>T<sub>in</sub></var>, <var>N<sub>disk</sub></var>, <var>&Gamma;</var> and <var>K</var>. This connects movement in the objective to movement in the model rather than leaving the animation as an abstract falling line.</p>
+          </section>
+
+          <section aria-labelledby="real-ga">
+            <h2 id="real-ga">3. Is this a real genetic algorithm?</h2>
+            <p>Yes.</p>
+            <p>That question deserves a direct answer because optimisation animations are very easy to fake. Interpolating between a bad spectrum and a good spectrum would produce something smooth, attractive and completely unrelated to the population that was evaluated.</p>
+            <p>The v0.2.0 path is less elegant and more honest:</p>
+            <div class="blogPostPipeline" aria-label="Generation evaluation pipeline">
+              <span>Normalized population</span>
+              <span>Decode physical parameters</span>
+              <span>Build photon spectra</span>
+              <span>Fold through area, redistribution and background</span>
+              <span>Evaluate Poisson C-statistic</span>
+              <span>Select, cross over and mutate</span>
+              <span>Emit the evaluated generation</span>
+            </div>
+            <p>The plotted spectrum for generation <var>g</var> is recalculated from the best genes stored for generation <var>g</var>. Population curves are recalculated from the population history. The score plot comes from the corresponding score history.</p>
+            <p>Everything in one frame therefore refers to the same evaluated state.</p>
+            <p>This is a surprisingly easy invariant to lose once plotting code becomes enthusiastic.</p>
+          </section>
+
+          <section aria-labelledby="results">
+            <h2 id="results">4. What did this particular run show?</h2>
+            <p>The demonstration uses the smoke profile: 32 individuals, 24 generations and 800 objective evaluations including the initial population.</p>
+
+            <div class="resultCards" aria-label="E08 smoke-run headline results">
+              <div class="resultCard"><span>Raw GA C-stat</span><strong>2079.873</strong></div>
+              <div class="resultCard"><span>GA + SciPy C-stat</span><strong>180.495</strong></div>
+              <div class="resultCard"><span>GA stopping state</span><strong>generation limit</strong></div>
+            </div>
+
+            <p>The raw GA did not converge. It reached the smoke profile's generation limit with a best C-statistic of 2079.873.</p>
+            <p>That is not a minor technicality hidden in a metadata file. It is the result.</p>
+            <p>The raw champion was in the correct general part of parameter space, but it had not resolved the strong trade-off between disk temperature, disk normalization, photon index and continuum normalization.</p>
+
+            <div class="blogPostTableWrap" tabindex="0" aria-label="Truth and fitted E08 parameters; scroll horizontally if needed">
+              <table>
+                <thead>
+                  <tr><th>Stage</th><th>T<sub>in</sub></th><th>N<sub>disk</sub></th><th>&Gamma;</th><th>K</th><th>C-stat</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Synthetic truth</td><td>0.650</td><td>8000</td><td>2.150</td><td>0.270</td><td>--</td></tr>
+                  <tr><td>Raw 24-generation GA</td><td>0.78767</td><td>1683.73</td><td>2.36647</td><td>0.388871</td><td>2079.873</td></tr>
+                  <tr><td>GA + SciPy L-BFGS-B</td><td>0.648885</td><td>8060.95</td><td>2.15046</td><td>0.269375</td><td>180.495</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p>Bounded SciPy L-BFGS-B then used the GA champion as its starting point and reached C-stat 180.495. The polished parameters lie extremely close to the injected values.</p>
+            <p>This does not prove that the GA defeated SciPy.</p>
+            <p>It proves that a global population can supply a basin and a local method can finish the numerical sentence much more efficiently than asking mutation to place the final decimal points.</p>
+          </section>
+
+          <section aria-labelledby="comparison">
+            <h2 id="comparison">5. The static comparison is still important</h2>
+            <p>An animation is good at showing a process. It is less good at supporting a careful final comparison because the evidence keeps changing while you are trying to look at it.</p>
+            <p>So v0.2.0 also saves a static figure containing the synthetic target, the raw GA model, the SciPy-polished model, both sets of synthetic residuals and the real MAXI/GSC reference as purple open circles.</p>
+
+            <figure class="evoxrbMediaWide">
+              <img src="assets/e08-ga-comparison.png" alt="EvoXRB E08 final comparison. The upper logarithmic panel overlays the synthetic Poisson target, raw GA model, GA plus SciPy model, and a separate real MAXI/GSC spectrum in purple open circles. The lower panel compares Pearson residuals calculated only for the synthetic target and shades channels outside the objective fit band." width="1507" height="1209" loading="lazy" decoding="async">
+              <figcaption>Figure 1: E08 smoke-run comparison with the real MAXI/GSC reference. The GA and SciPy fit only the synthetic / NICER-inspired target; the purple open circles are an observational overlay and never enter the displayed C-statistic or residuals.</figcaption>
+            </figure>
+
+            <p>The residual denominator is</p>
+            <div class="blogPostEquation" role="math" aria-label="n i minus mu i divided by the square root of the maximum of mu i and one">r<sub>i</sub> = (n<sub>i</sub> - &mu;<sub>i</sub>) / &radic;max(&mu;<sub>i</sub>, 1).</div>
+            <p>The fit itself continues to use the Poisson C-statistic. The residuals are a diagnostic view, not a second objective quietly introduced after the calculation.</p>
+          </section>
+
+          <section aria-labelledby="real-data">
+            <h2 id="real-data">6. Where does real data enter?</h2>
+            <p>This is the section where it would be very easy to overstate what changed.</p>
+            <p>This replay includes an official real MAXI/GSC spectrum of MAXI J1820+070 from <a href="https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html">the MAXI on-demand processing result</a>. It covers MJD 58301.5--58302.5, close to the E08 reference date, with 1539.5 seconds of exposure and 16 half-keV bins across 2--10 keV.</p>
+            <p>The selected band contains 3004 source-region counts and 330 background-region counts. The background is scaled by exposure and <code>BACKSCAL</code>, and Poisson errors from the source and scaled background are propagated into the plotted count-rate-density uncertainty.</p>
+            <p>The publication bundle includes the derived <a href="assets/maxi-j1820-reference.csv">reference CSV</a> and its <a href="assets/maxi-j1820-reference.provenance.json">provenance record</a>. Those files preserve the route from the official result to the sixteen purple open circles rather than asking a caption to carry the entire chain of custody.</p>
+            <p>But the real spectrum remains a visual overlay only. The synthetic target is what the GA and bounded SciPy L-BFGS-B fit. MAXI/GSC values are never passed into the Poisson objective, never change selection, and never appear in the Pearson residual calculation.</p>
+            <aside class="blogPostCallout blogPostCallout--warning">
+              <p><strong>Two count-rate spectra on one axis are not automatically the same measurement.</strong></p>
+              <p>The vertical separation between the real MAXI/GSC points and the NICER-inspired synthetic model is not a model residual. A physical cross-instrument comparison needs the relevant source and background products, exposure, response matrices, effective areas, calibration choices and likelihood treatment for each instrument. EvoXRB therefore refuses to turn the raw overlay into a fit statistic.</p>
+            </aside>
+            <p>The reference makes the comparison real. The boundary around what was fitted makes it accurate.</p>
+            <p><strong>Acknowledgment:</strong> This research has made use of MAXI data provided by RIKEN, JAXA and the MAXI team.</p>
+          </section>
+
+          <section aria-labelledby="live-saved">
+            <h2 id="live-saved">7. Live calculation and saved replay are different jobs</h2>
+            <p>The live viewer is attached directly to the generation callback. On a desktop Matplotlib backend it updates the current spectrum and residuals while the optimiser is still calculating.</p>
+            <p>The saved replay is built from the completed, persisted history. It works in a headless environment and can be exported as self-contained HTML, GIF through Pillow, or MP4 when FFmpeg is available.</p>
+            <p>The two paths deliberately share the same spectral calculations, but they solve different problems.</p>
+            <ul>
+              <li>Live mode answers: <em>what is the optimiser doing now?</em></li>
+              <li>The saved replay answers: <em>what exactly did this run do?</em></li>
+            </ul>
+            <p>The website compiler takes the saved HTML one step further. It extracts the embedded PNG frames, moves behaviour into external JavaScript, adds labels and keyboard controls, starts paused and places the player inside an isolated iframe.</p>
+            <p>Scientific Python is very good at making figures.</p>
+            <p>It is not automatically good at making those figures behave politely inside somebody else's website.</p>
+          </section>
+
+          <section aria-labelledby="checkpoints">
+            <h2 id="checkpoints">8. Checkpointing without accidentally changing the experiment</h2>
+            <p>A long GA should be resumable. It should not be resumable against different data while pretending nothing changed.</p>
+            <p>Each animated fit therefore creates an objective signature covering the configuration, continuum choice, target counts, exposure, fit mask, response energy grids and bin edges, effective area, redistribution matrix and background.</p>
+            <p>A signed checkpoint can only resume when the caller supplies the same signature.</p>
+            <p>This is intentionally conservative. Reusing a population is easy. Reusing its cached scores after changing the response is wrong.</p>
+            <p>The output summary records both the configuration digest and objective signature, while the public website metadata removes absolute workstation paths.</p>
+            <p>Reproducibility is not improved by publishing the name of my Windows user directory.</p>
+          </section>
+
+          <section aria-labelledby="running">
+            <h2 id="running">9. Running the experiment</h2>
+            <p>From the repository root:</p>
+            <pre><code>python -m pip install -e ".[test]"
+python -m evoxrb animate --profile smoke --epoch E08</code></pre>
+            <p>To watch the calculation live:</p>
+            <pre><code>python -m evoxrb animate --profile smoke --epoch E08 --live</code></pre>
+            <p>To add the published MAXI/GSC reference:</p>
+            <pre><code>python -m evoxrb animate \
+  --profile smoke \
+  --epoch E08 \
+  --reference-csv data/reference/maxi_j1820p070_mjd58302.csv</code></pre>
+            <p>And to rebuild this copy-ready website bundle from the generated replay:</p>
+            <pre><code>python -m evoxrb animate --profile smoke --epoch E08 --reference-csv data/reference/maxi_j1820p070_mjd58302.csv --output results/animations/E08_ga_spectra.html --comparison-output results/animations/E08_ga_comparison.png
+python scripts/build_blog_bundle.py
+python -m http.server 8000 --directory website/evoxrb-v0.2.0</code></pre>
+            <p>The site uses relative paths and no remote runtime dependencies. Copy the entire <code>website/evoxrb-v0.2.0</code> directory into a static host and the article, player, frames, comparison image, metadata and LaTeX source travel together.</p>
+          </section>
+
+          <section aria-labelledby="did-work">
+            <h2 id="did-work">10. So, did adding an animation improve the science?</h2>
+            <p>Did it make the raw smoke-profile GA converge?</p>
+            <p><strong>No.</strong></p>
+            <p>Did it make the algorithm look more competent than the numbers say it was?</p>
+            <p><strong>Also no.</strong> The structured residuals are now much harder to ignore.</p>
+            <p>Did it make the relationship between population search, parameter degeneracy and local polishing easier to understand?</p>
+            <p><strong>Yes.</strong></p>
+            <p>Did it create a sensible interface for placing an actual reference spectrum next to the synthetic experiment without quietly pretending that the educational response calibrated it?</p>
+            <p><strong>Yes.</strong></p>
+            <p>The next important step is still the same one identified in Part I: increase the difficulty of the likelihood landscape and eventually replace the synthetic products with a properly reduced observation and its matching calibration files.</p>
+            <p>But v0.2.0 makes the intermediate experiment observable.</p>
+            <p>That matters because optimisation is not only a machine for producing a final row of parameters.</p>
+            <p>It is a process.</p>
+            <p>And processes are much easier to trust when they are allowed to leave evidence.</p>
+          </section>
+
+          <section aria-labelledby="references">
+            <h2 id="references">11. References and further reading</h2>
+            <ol class="blogPostReferences">
+              <li>Seifi, S. <cite>EvoXRB: Genetic Algorithms, and a Very Real Black Hole</cite> (2026). <a href="https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/">Part I</a>.</li>
+              <li>Cash, W. <cite>Parameter estimation in astronomy through application of the likelihood ratio</cite>, Astrophysical Journal 228, 939 (1979). <a href="https://ntrs.nasa.gov/citations/19790043693">NASA NTRS record</a>.</li>
+              <li>SciPy documentation. <a href="https://docs.scipy.org/doc/scipy/reference/optimize.minimize-lbfgsb.html">Bounded L-BFGS-B minimisation</a>.</li>
+              <li>Matplotlib documentation. <a href="https://matplotlib.org/stable/api/animation_api.html">Animation API and writer classes</a>.</li>
+              <li>NASA HEASARC. <a href="https://heasarc.gsfc.nasa.gov/docs/nicer/">NICER analysis documentation</a>.</li>
+              <li>Matsuoka, M. et al. <cite>The MAXI Mission on the ISS: Science and Instruments for Monitoring All-Sky X-Ray Images</cite>, Publications of the Astronomical Society of Japan 61, 999 (2009). <a href="https://ui.adsabs.harvard.edu/abs/2009PASJ...61..999M/abstract">ADS record</a>.</li>
+              <li>MAXI on-demand processing. <a href="https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html">MAXI J1820+070 result for MJD 58301.5--58302.5</a>.</li>
+            </ol>
+          </section>
+
+          <footer class="blogPostFooter">
+            <a href="https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/">&larr; Read Part I</a>
+            <span>EvoXRB v0.2.0</span>
+          </footer>
+        </div>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

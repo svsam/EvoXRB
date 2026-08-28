@@ -1,0 +1,47 @@
+{
+  "config_digest": "d17357d31d720259",
+  "continuum": "powerlaw",
+  "epoch_id": "E08",
+  "frames": 25,
+  "ga": {
+    "best_parameters": {
+      "gamma": 2.3664718797501614,
+      "ndisk": 1683.7332304732652,
+      "norm": 0.3888712789756588,
+      "tin": 0.7876706176660502
+    },
+    "best_score": 2079.8725327359107,
+    "converged": false,
+    "evaluations": 800,
+    "generations": 24,
+    "seed": "9554544384653782853",
+    "stop_reason": "max_generations"
+  },
+  "notice": "The replay target is synthetic. The real MAXI/GSC reference is a visual overlay only and is not included in the C-statistic.",
+  "objective_signature": "44aef8e00f1935dd8777902da3ecff9581045c717f870238999fb92487a5b943",
+  "profile": "smoke",
+  "project_version": "0.2.0",
+  "reference": {
+    "input_representation": "count_rate_density",
+    "label": "MAXI/GSC MAXI J1820+070, MJD 58301.5-58302.5",
+    "notice": "Visual comparison only; this reference spectrum is not used for C-stat fitting without its matching instrument response and calibration products.",
+    "points": 16,
+    "source": "https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html"
+  },
+  "reference_used": true,
+  "schema_version": 1,
+  "scipy_polish": {
+    "evaluations": 222,
+    "iterations": 32,
+    "method": "L-BFGS-B",
+    "parameters": {
+      "gamma": 2.1504625326207467,
+      "ndisk": 8060.945311226498,
+      "norm": 0.2693751431719469,
+      "tin": 0.6488849426455214
+    },
+    "score": 180.494813188821,
+    "success": true
+  },
+  "scope": "Synthetic / NICER-inspired"
+}

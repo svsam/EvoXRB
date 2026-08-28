@@ -1,0 +1,39 @@
+{
+  "acknowledgement": "This research has made use of MAXI data provided by RIKEN, JAXA and the MAXI team.",
+  "background_observation": {
+    "backscal": 0.07547004,
+    "exposure_s": 1539.50060844811
+  },
+  "background_scale_in_source_counts": 0.4170560662921871,
+  "citation": "Matsuoka et al. (2009), The MAXI Mission on the ISS, PASJ 61, 999",
+  "display_binning": {
+    "bin_width_keV": 0.5,
+    "energy_max_keV": 10.0,
+    "energy_min_keV": 2.0,
+    "selection": "EBOUNDS channel centre, rounded to 1e-6 keV, in half-open display bin"
+  },
+  "input_files": {
+    "MAXI_J1820p070_MJD58302_gsc.pi.gz": "7d76211fdb42752437e25f7549247bbf7ed0beef80f1cbbf3741fb3b0b6ae0b5",
+    "MAXI_J1820p070_MJD58302_gsc.rmf.gz": "10b31dbabc9ae74ccd131f5edeb077cad3e88ab4a9ed7a274e1ef5c06f19fb1d",
+    "MAXI_J1820p070_MJD58302_gsc_bgd.pi.gz": "f6bd555f1639b46cf2295d620277cc7b2dac3be35f2e1cd5c54a0a30d77ca02b"
+  },
+  "instrument": "MAXI/GSC",
+  "interpretation": "Background-subtracted MAXI/GSC detector count-rate density. It is a real-data visual reference, not a NICER-calibrated fit target and not included in the EvoXRB C-statistic.",
+  "job_id": "20260828013000_evoxrbv020real01",
+  "mjd_start": 58301.5,
+  "mjd_stop": 58302.5,
+  "position_j2000_degrees": {
+    "dec": 7.1853,
+    "ra": 275.0914
+  },
+  "result_url": "https://maxi.riken.jp/mxondem/api/results/20260828013000_evoxrbv020real01/index.html",
+  "schema_version": 1,
+  "service": "RIKEN/JAXA MAXI on-demand process",
+  "source_observation": {
+    "backscal": 0.03147523,
+    "date_end": "2018-07-03",
+    "date_obs": "2018-07-02",
+    "exposure_s": 1539.501
+  },
+  "target": "MAXI J1820+070"
+}

@@ -171,9 +171,11 @@ def local_polish(
         bounds=search_space.unit_bounds,
         options=dict(options) if options is not None else None,
     )
-    runtime = time.perf_counter() - started
     candidate = np.clip(np.asarray(result.x, dtype=float), 0.0, 1.0)
-    candidate_score = float(result.fun) if np.isfinite(result.fun) else float("inf")
+    # Re-evaluate the exact clipped genes that will be returned and plotted;
+    # an optimizer's cached ``fun`` may correspond to a pre-clip vector.
+    candidate_score = _safe_gene_objective(candidate, objective, search_space)
+    runtime = time.perf_counter() - started
 
     # A failed line search must never make a supplied GA solution worse.
     if start_score < candidate_score:
@@ -196,7 +198,7 @@ def local_polish(
         success=success,
         message=message,
         method=method,
-        evaluations=int(getattr(result, "nfev", 0)),
+        evaluations=int(getattr(result, "nfev", 0)) + 2,
         iterations=int(getattr(result, "nit", 0)),
         runtime_seconds=float(runtime),
     )
