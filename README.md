@@ -2,6 +2,43 @@
 
 ## [Blog post](https://svsam.com/blog/evoxrb-genetic-algorithms-x-ray-astronomy/)
 
+## The problem
+
+Response-folded X-ray spectra produce bounded, correlated fitting problems where
+a local optimiser can settle into the wrong basin. EvoXRB asks when a
+population-based genetic algorithm helps, whether a local polishing stage is
+still necessary, and how an apparently good optimum can remain scientifically
+wrong when the forward model is misspecified.
+
+## The approach
+
+The project generates a twelve-epoch synthetic outburst with known injected
+truth, folds approximate disk and continuum models through a transparent
+NICER-inspired response, adds Poisson counts and background, and fits the result
+with both a custom real-valued GA and deterministic multi-start SciPy. The best
+global solution seeds posterior inference, while a separate synthetic timing
+pipeline tests recovery of injected QPO-like signals.
+
+![Synthetic optimiser comparison across the committed smoke run](figures/generated/optimizer_comparison.png)
+
+## What I found
+
+The committed smoke run makes the central result quite stark. Its reduced-budget
+raw GA rows often stop far from the best solution, but GA followed by bounded
+SciPy polishing reaches essentially the same C-statistic as multi-start SciPy.
+For the correct 512-second model, the polished and multi-start fits both report
+zero failures in the committed recovery table; fitting cutoff-generated data
+with the simpler power law still leaves systematic parameter bias even after the
+numerical optimum is found. The injected 5 Hz signal in epoch E08 is recovered at
+`5.03 Hz` and labelled type-C-like under the declared synthetic criteria.
+
+Those are smoke-profile integration results, not measurements of MAXI J1820+070
+and not a completed full numerical campaign. They support the software design
+and the importance of local polishing and model checking; the opt-in full profile
+is where the stated campaign-level acceptance criteria belong.
+
+## Current scope
+
 EvoXRB is a **Synthetic / NICER-inspired** case study in response-folded X-ray
 spectral fitting, global optimization, posterior inference, and timing. It is
 implemented entirely with native Windows Python 3.14 packages—there is no
@@ -105,6 +142,10 @@ matching response, background, exposure, calibration and likelihood.
 To regenerate the CSV from the official OGIP files, install the optional
 `real-data` dependency and run `scripts/prepare_maxi_reference.py`. The required
 MAXI acknowledgement and citation are recorded in `data/reference/README.md`.
+
+The repository currently commits deterministic smoke-profile artifacts and a
+passing artifact-validation record. The larger five-seed, 192-member campaign is
+implemented but deliberately opt-in because of its computational cost.
 
 
 The fixed phase/date anchors follow the published evolution only as context:
